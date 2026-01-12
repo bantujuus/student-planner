@@ -10,6 +10,13 @@ export default function StudentPlanner() {
   const [filter, setFilter] = useState('All');
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [notifiedTasks, setNotifiedTasks] = useState([]);
+  const [editingTask, setEditingTask] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editCategory, setEditCategory] = useState('Study');
+
+
 
   /* ================== LOCAL STORAGE ================== */
   useEffect(() => {
@@ -20,6 +27,19 @@ export default function StudentPlanner() {
   useEffect(() => {
     localStorage.setItem('studentTasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  useEffect(() => {
+  if ("Notification" in window) {
+    Notification.requestPermission().then((result)=> {
+      console.log("Notification permission:", result);
+    });
+  }
+}, []);
+useEffect(() => {
+  notifyDueTasks();
+}, [tasks]);
+
+
 
   /* ================== TASK ACTIONS ================== */
   const addTask = () => {
@@ -49,6 +69,26 @@ export default function StudentPlanner() {
   const deleteTask = (id) => {
     setTasks(tasks.filter(task => task.id !== id));
   };
+  const startEdit = (task) => {
+  setEditingTask(task.id);
+  setEditTitle(task.title);
+  setEditDueDate(task.dueDate);
+  setEditCategory(task.category);
+};
+const saveEdit = () => {
+  setTasks(tasks.map(task =>
+    task.id === editingTask
+      ? {
+          ...task,
+          title: editTitle,
+          dueDate: editDueDate,
+          category: editCategory
+        }
+      : task
+  ));
+
+  setEditingTask(null);
+};
 
   /* ================== FILTERS & STATS ================== */
  const getFilteredTasks = () => {
@@ -67,7 +107,33 @@ export default function StudentPlanner() {
   }
 
   return filtered;
+  
 };
+
+const notifyDueTasks = () => {
+  if (Notification.permission !== "granted") return;
+
+  const today = new Date().toDateString();
+
+  tasks.forEach(task => {
+    const taskDate = new Date(task.dueDate).toDateString();
+
+    if (
+      !task.completed &&
+      taskDate === today &&
+      !notifiedTasks.includes(task.id)
+    ) {
+      new Notification("📌 Task Due Today", {
+        body: task.title,
+        icon: mulungushiLogo
+      });
+
+      setNotifiedTasks(prev => [...prev, task.id]);
+    }
+  });
+};
+
+
 
 
   const getProgress = () => {
@@ -76,6 +142,31 @@ export default function StudentPlanner() {
       (tasks.filter(t => t.completed).length / tasks.length) * 100
     );
   };
+  // AI function
+  const getAISuggestion = () => {
+  if (tasks.length === 0) {
+    return "Add some tasks to get smart study tips 📘";
+  }
+
+  const overdue = tasks.filter(
+    t => !t.completed && new Date(t.dueDate) < new Date()
+  ).length;
+
+  const examTasks = tasks.filter(
+    t => t.category === 'Exams' && !t.completed
+  ).length;
+
+  if (overdue >= 3) {
+    return "⚠️ You have multiple overdue tasks. Focus on them first!";
+  }
+
+  if (examTasks >= 2) {
+    return "📚 Exams are coming up. Prioritize exam-related tasks.";
+  }
+
+  return "✅ You're on track! Keep maintaining your study plan.";
+};
+
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') addTask();
@@ -138,6 +229,7 @@ export default function StudentPlanner() {
             <span className={`text-2xl font-bold ${textClass}`}>{progress}%</span>
           </div>
 
+
           <div className="w-full bg-gray-300 rounded-full h-4">
             <div
               className="h-4 rounded-full bg-gradient-to-r from-blue-700 to-red-600 transition-all"
@@ -149,6 +241,11 @@ export default function StudentPlanner() {
             {tasks.filter(t => t.completed).length} of {tasks.length} tasks completed
           </p>
         </div>
+        <div className={`${cardBg} rounded-xl shadow-lg p-5 mb-6 border-l-4 border-indigo-500`}>
+  <h3 className={`font-semibold mb-2 ${textClass}`}>🤖 AI Study Assistant</h3>
+  <p className={secondaryText}>{getAISuggestion()}</p>
+</div>
+
 
         {/* ADD TASK */}
         <div className={`${cardBg} rounded-xl shadow-lg p-6 mb-6`}>
